@@ -1,0 +1,50 @@
+model:
+  image_size: 224
+  patch_size: 16
+  latent_dim: 512
+  hidden_dim: 512
+  coord_dim: 2
+  coord_embed_dim: 64
+  action_embed_dim: 64
+  action_type: "continuous_delta"
+  dynamics_type: "gru"
+  mask_ratio: 0.5
+  encoder_depth: 4
+  decoder_depth: 2
+  num_heads: 8
+  decoder_num_heads: 8
+  conv_stem_channels: [64, 128]
+  compile: false
+
+data:
+  coordinate_normalization: "image_size"
+  use_dense_pseudo: false
+  max_frames_per_clip: null
+  num_sparse_anchors: 20
+  image_width: null
+  image_height: null
+
+train:
+  batch_size: 16
+  num_workers: 8
+  lr: 1.0e-4
+  weight_decay: 1.0e-4
+  epochs: 100
+  precision: "amp"
+  seed: 42
+  grad_clip_norm: 100.0
+  output_dir: "checkpoints"
+  log_every: 20
+  freeze_encoder: false
+
+loss:
+  recon_weight: 1.0
+  latent_weight: 1.0
+  sparse_coord_weight: 10.0
+  dense_coord_weight: 1.0
+  smoothness_weight: 0.1
+  coord_loss: "smooth_l1"
+
+eval:
+  report_pixel_metrics: true
+  horizons: [1, 3, 5, 10, 20]
