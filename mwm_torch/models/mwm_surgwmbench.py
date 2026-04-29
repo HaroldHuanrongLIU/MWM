@@ -31,6 +31,7 @@ class MWMSurgWMBenchModel(nn.Module):
         latent_dim: int = 512,
         hidden_dim: int = 512,
         coord_dim: int = 2,
+        action_dim: int = 2,
         coord_embed_dim: int = 64,
         action_embed_dim: int = 64,
         action_type: str = "continuous_delta",
@@ -63,6 +64,7 @@ class MWMSurgWMBenchModel(nn.Module):
         self.dynamics = dynamics_cls(
             latent_dim=latent_dim,
             coord_dim=coord_dim,
+            action_dim=action_dim,
             action_type=action_type,
             action_embed_dim=action_embed_dim,
             coord_embed_dim=coord_embed_dim,
@@ -99,7 +101,7 @@ class MWMSurgWMBenchModel(nn.Module):
 
         assert z.shape[:2] == coords.shape[:2], "Latents and coordinates must share [B, T]."
         assert actions.shape[:2] == (z.shape[0], max(z.shape[1] - 1, 0)), (
-            f"Expected actions [B, T-1, 2], got {tuple(actions.shape)} for z {tuple(z.shape)}."
+            f"Expected actions [B, T-1, A], got {tuple(actions.shape)} for z {tuple(z.shape)}."
         )
         return self.dynamics(z, actions, coords)
 
@@ -126,8 +128,8 @@ class MWMSurgWMBenchModel(nn.Module):
             pred_coord = self.decode_coords(z)
             z_preds.append(z)
             coord_preds.append(pred_coord)
-            if actions.shape[-1] == self.coord_dim:
-                coord = (coord + actions[:, step]).clamp(0.0, 1.0)
+            if actions.shape[-1] >= self.coord_dim:
+                coord = (coord + actions[:, step, : self.coord_dim]).clamp(0.0, 1.0)
             else:
                 coord = pred_coord
         if not z_preds:

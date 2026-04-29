@@ -24,7 +24,6 @@ class ContinuousActionEmbedding(nn.Module):
         self.net = _mlp(action_dim, hidden_dim, embed_dim, depth=1)
 
     def forward(self, actions: torch.Tensor) -> torch.Tensor:
-        assert actions.shape[-1] == 2, f"Expected continuous actions [..., 2], got {tuple(actions.shape)}."
         return self.net(actions)
 
 
@@ -68,6 +67,7 @@ class MLPDynamics(nn.Module):
         self,
         latent_dim: int,
         coord_dim: int = 2,
+        action_dim: int = 2,
         action_type: str = "continuous_delta",
         action_embed_dim: int = 64,
         coord_embed_dim: int = 64,
@@ -76,7 +76,7 @@ class MLPDynamics(nn.Module):
         super().__init__()
         self.latent_dim = latent_dim
         self.action_embed = (
-            ContinuousActionEmbedding(2, action_embed_dim, hidden_dim)
+            ContinuousActionEmbedding(action_dim, action_embed_dim, hidden_dim)
             if action_type == "continuous_delta"
             else DiscreteContinuousActionEmbedding(action_embed_dim, hidden_dim)
         )
@@ -110,6 +110,7 @@ class GRUDynamics(nn.Module):
         self,
         latent_dim: int,
         coord_dim: int = 2,
+        action_dim: int = 2,
         action_type: str = "continuous_delta",
         action_embed_dim: int = 64,
         coord_embed_dim: int = 64,
@@ -119,7 +120,7 @@ class GRUDynamics(nn.Module):
         self.latent_dim = latent_dim
         self.hidden_dim = hidden_dim
         self.action_embed = (
-            ContinuousActionEmbedding(2, action_embed_dim, hidden_dim)
+            ContinuousActionEmbedding(action_dim, action_embed_dim, hidden_dim)
             if action_type == "continuous_delta"
             else DiscreteContinuousActionEmbedding(action_embed_dim, hidden_dim)
         )

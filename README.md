@@ -59,28 +59,88 @@ PY
 
 ## Commands
 
-Sparse dynamics training with the current CLI:
+Dataset sanity check:
+
+```bash
+uv run --locked python -m mwm_torch.data.validate_surgwmbench \
+  --dataset-root /path/to/SurgWMBench \
+  --train-manifest manifests/train.jsonl \
+  --val-manifest manifests/val.jsonl \
+  --test-manifest manifests/test.jsonl \
+  --check-files \
+  --check-interpolations
+```
+
+MAE pretraining from raw source videos:
 
 ```bash
 uv run --locked python -m mwm_torch.train_surgwmbench \
-  --mode train_dynamics \
-  --data-root /path/to/SurgWMBench \
-  --manifest manifests/train.jsonl \
+  --mode pretrain_mae \
+  --dataset-root /path/to/SurgWMBench \
+  --config configs/surgwmbench_mwm.yaml \
+  --ssl-source raw_videos
+```
+
+Use extracted clip frames if raw video decoding is unavailable:
+
+```bash
+uv run --locked python -m mwm_torch.train_surgwmbench \
+  --mode pretrain_mae \
+  --dataset-root /path/to/SurgWMBench \
+  --train-manifest manifests/train.jsonl \
+  --config configs/surgwmbench_mwm.yaml \
+  --ssl-source clip_frames
+```
+
+Sparse dynamics training:
+
+```bash
+uv run --locked python -m mwm_torch.train_surgwmbench \
+  --mode train_dynamics_sparse \
+  --dataset-root /path/to/SurgWMBench \
+  --train-manifest manifests/train.jsonl \
   --val-manifest manifests/val.jsonl \
+  --interpolation-method linear \
+  --pretrained-encoder checkpoints/mwm_mae_surgwmbench.pt \
   --config configs/surgwmbench_mwm.yaml
 ```
 
-Evaluation:
+Dense pseudo-coordinate auxiliary training:
+
+```bash
+uv run --locked python -m mwm_torch.train_surgwmbench \
+  --mode train_dynamics_dense_aux \
+  --dataset-root /path/to/SurgWMBench \
+  --train-manifest manifests/train.jsonl \
+  --val-manifest manifests/val.jsonl \
+  --interpolation-method linear \
+  --use-dense-pseudo \
+  --pretrained-encoder checkpoints/mwm_mae_surgwmbench.pt \
+  --config configs/surgwmbench_mwm.yaml
+```
+
+Sparse-primary evaluation:
 
 ```bash
 uv run --locked python -m mwm_torch.eval_surgwmbench \
-  --data-root /path/to/SurgWMBench \
+  --dataset-root /path/to/SurgWMBench \
   --manifest manifests/test.jsonl \
   --checkpoint checkpoints/mwm_surgwmbench.pt \
+  --interpolation-method linear \
   --output results/mwm_linear_test_metrics.json
 ```
 
-MAE pretraining and dense auxiliary training use the data loaders in `mwm_torch.data`; their CLI integration is staged separately from the current data-loader migration.
+Add dense pseudo-coordinate auxiliary metrics:
+
+```bash
+uv run --locked python -m mwm_torch.eval_surgwmbench \
+  --dataset-root /path/to/SurgWMBench \
+  --manifest manifests/test.jsonl \
+  --checkpoint checkpoints/mwm_surgwmbench.pt \
+  --interpolation-method linear \
+  --dense-pseudo-eval \
+  --output results/mwm_linear_test_metrics.json
+```
 
 ## Notes
 

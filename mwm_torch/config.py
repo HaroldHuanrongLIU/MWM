@@ -16,9 +16,11 @@ class ModelConfig:
     latent_dim: int = 512
     hidden_dim: int = 512
     coord_dim: int = 2
+    action_dim: int = 3
     coord_embed_dim: int = 64
     action_embed_dim: int = 64
     action_type: str = "continuous_delta"
+    use_time_delta: bool = True
     dynamics_type: str = "gru"
     mask_ratio: float = 0.5
     encoder_depth: int = 4
@@ -31,12 +33,40 @@ class ModelConfig:
 
 @dataclass
 class DataConfig:
+    dataset_name: str = "SurgWMBench"
+    dataset_root: str = "/path/to/SurgWMBench"
+    train_manifest: str = "manifests/train.jsonl"
+    val_manifest: str = "manifests/val.jsonl"
+    test_manifest: str = "manifests/test.jsonl"
+    interpolation_method: str = "linear"
+    default_interpolation_method: str = "linear"
+    available_interpolation_methods: list[str] = field(
+        default_factory=lambda: ["linear", "pchip", "akima", "cubic_spline"]
+    )
+    frame_sampling: str = "sparse_anchors"
     coordinate_normalization: str = "image_size"
+    coordinate_format: str = "norm"
     use_dense_pseudo: bool = False
     max_frames_per_clip: int | None = None
     num_sparse_anchors: int = 20
     image_width: int | None = None
     image_height: int | None = None
+    image_size: int = 224
+    split_policy: str = "patient_video_level_existing_manifests"
+    source_encoding: dict[str, int] = field(
+        default_factory=lambda: {"unlabeled": 0, "human": 1, "interpolated": 2}
+    )
+    ssl: dict[str, Any] = field(
+        default_factory=lambda: {
+            "source": "raw_videos",
+            "backend": "opencv",
+            "clip_length": 16,
+            "stride": 4,
+            "fallback_to_clip_frames": True,
+            "max_videos": None,
+            "max_clips_per_video": None,
+        }
+    )
 
 
 @dataclass
@@ -60,14 +90,18 @@ class LossConfig:
     latent_weight: float = 1.0
     sparse_coord_weight: float = 10.0
     dense_coord_weight: float = 1.0
+    dense_pseudo_coord_weight: float = 1.0
     smoothness_weight: float = 0.1
     coord_loss: str = "smooth_l1"
 
 
 @dataclass
 class EvalConfig:
+    primary_target: str = "sparse_human_anchors"
     report_pixel_metrics: bool = True
     horizons: list[int] = field(default_factory=lambda: [1, 3, 5, 10, 20])
+    stratify_by_difficulty: bool = True
+    dense_pseudo_eval: bool = False
 
 
 @dataclass

@@ -837,7 +837,7 @@ def collate_sparse_anchors(batch: list[dict[str, Any]]) -> dict[str, Any]:
     sparse_anchor_mask = torch.ones(coords.shape[:2], dtype=torch.bool)
     image_size_original = torch.tensor([item["image_size_original"] for item in batch], dtype=torch.long)
     image_size = torch.stack([item["image_size"] for item in batch], dim=0)
-    sparse_positions = torch.arange(coords.shape[1], dtype=torch.long).unsqueeze(0).expand(len(batch), -1)
+    sparse_positions = torch.arange(coords.shape[1], dtype=torch.long).unsqueeze(0).expand(len(batch), -1).clone()
     return {
         "frames": frames,
         "coords": coords,

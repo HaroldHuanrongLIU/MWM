@@ -21,6 +21,7 @@ def coordinate_loss(
     target: torch.Tensor,
     mask: torch.Tensor,
     loss_type: str = "smooth_l1",
+    weights: torch.Tensor | None = None,
 ) -> torch.Tensor:
     """Masked coordinate regression loss."""
 
@@ -31,6 +32,9 @@ def coordinate_loss(
         values = F.smooth_l1_loss(pred, target, reduction="none").sum(dim=-1)
     else:
         raise ValueError(f"Unsupported coordinate loss_type={loss_type!r}.")
+    if weights is not None:
+        assert weights.shape == mask.shape, f"Weight shape {weights.shape} must match mask shape {mask.shape}."
+        values = values * weights.to(dtype=values.dtype)
     return masked_mean(values, mask)
 
 
