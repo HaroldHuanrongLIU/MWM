@@ -1,64 +1,90 @@
-# Masked World Models for Visual Control
+# SurgWMBench MWM PyTorch Baseline
 
-Implementation of the MWM in TensorFlow 2. Our code is based on the implementation of [DreamerV2](https://github.com/danijar/dreamerv2) and [APV](https://arxiv.org/abs/2203.13880). Raw data we used for reporting our main experimental results is available in `scores` directory.
+This repository is adapted for **SurgWMBench: A Dataset and World-Model Benchmark for Surgical Instrument Motion Planning**. The active implementation is the PyTorch code under `mwm_torch/`; the original TensorFlow MWM code under `mwm/` is kept only as historical reference.
 
-## Updates
-### 11 June 2023
-- We recent become aware that public implementation of MWM is not able to reproduce the results in the paper for DMC tasks, currently working to fix the bugs.
+The final public dataset version is `SurgWMBench`, not `SurgWMBenchv2`.
 
-### 17 August 2022
-- Updated default hyperparameters which have been different from the hyperparameters used for reporting the results in the paper. Specifically, `aent.scale` is changed from 1.0 to 1e-4 and `kl.scale` is changed from 0.1 to 1.0. Please re-run experiments with updated parameters if you want to reproduce the results manually.
+## Environment
 
-### 10 August 2022
-- Added raw logs `score.json` which were used for generating the figures for the paper.
+Recommended reproducible setup:
 
-## Method
-Masked World Models (MWM) is a visual model-based RL algorithm that decouples visual representation learning and dynamics learning. The key idea of MWM is to train an autoencoder that reconstructs visual observations with convolutional feature masking, and a latent dynamics model on top of the autoencoder.
-
-![overview_figure](https://user-images.githubusercontent.com/20944657/176366822-1c755eee-392e-4b7b-a1d0-8a34417888bc.gif)
-
-
-## Instructions
-
-PyTorch SurgWMBench environment:
-```
+```bash
 uv sync --locked
-```
-
-For raw `.avi` video decoding support:
-```
-uv sync --locked --extra raw-video
-```
-
-Run tests in the locked environment:
-```
 uv run --locked python -m pytest -q
 ```
 
-Get dependencies:
-```
-pip install tensorflow==2.6.0 tensorflow_text==2.6.0 tensorflow_estimator==2.6.0 tensorflow_probability==0.14.1 ruamel.yaml 'gym[atari]' dm_control tfimm git+https://github.com/rlworkgroup/metaworld.git@a0009ed9a208ff9864a5c1368c04c273bb20dd06#egg=metaworld
+Pip fallback:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python -m pytest -q
 ```
 
-Below are scripts to reproduce our experimental results. It is possible to run experiments with/without early convolution and reward prediction by leveraging `mae.reward_pred` and `mae.early_conv` arguments.
+The lock file targets Python `3.13` and includes PyTorch, torchvision, OpenCV, PIL, PyYAML, NumPy, and pytest.
 
-[Meta-world](https://github.com/rlworkgroup/metaworld) experiments
-```
-TF_XLA_FLAGS=--tf_xla_auto_jit=2 python mwm/train.py --logdir logs --configs metaworld --task metaworld_peg_insert_side --steps 502000 --mae.reward_pred True --mae.early_conv True
+## Dataset
+
+Expected final dataset root:
+
+```text
+SurgWMBench/
+  videos/<source_video_id>/video_left.avi
+  clips/<patient_id>/<trajectory_id>/frames/
+  clips/<patient_id>/<trajectory_id>/annotation.json
+  interpolations/<patient_id>/<trajectory_id>.<method>.json
+  manifests/{train,val,test,all}.jsonl
+  metadata/
 ```
 
-[RLBench](https://github.com/stepjam/RLBench) experiments
-```
-TF_XLA_FLAGS=--tf_xla_auto_jit=2 python mwm/train.py --logdir logs --configs rlbench --task rlbench_reach_target --steps 502000 --mae.reward_pred True --mae.early_conv True
+All paths inside JSON/JSONL files are relative to the dataset root. Use official manifests only; the code should not create random train/val/test splits.
+
+The primary benchmark target is the sparse set of exactly 20 human-labeled anchors in `annotation.json`. Dense pseudo coordinates from interpolation files are auxiliary only. Supported interpolation methods are `linear`, `pchip`, `akima`, and `cubic_spline`.
+
+## Data Smoke Check
+
+```bash
+uv run --locked python - <<'PY'
+from pathlib import Path
+from mwm_torch.data import SurgWMBenchClipDataset, collate_sparse_anchors
+
+root = Path("/mnt/hdd1/neurips2026_dataset_track/SurgWMBench")
+dataset = SurgWMBenchClipDataset(root, "manifests/train.jsonl", frame_sampling="sparse_anchors")
+item = dataset[0]
+batch = collate_sparse_anchors([dataset[0], dataset[1]])
+print(len(dataset), item["trajectory_id"], item["frames"].shape, batch["frames"].shape)
+PY
 ```
 
-[DeepMind Control Suite](https://github.com/deepmind/dm_control) experiments
+## Commands
+
+Sparse dynamics training with the current CLI:
+
+```bash
+uv run --locked python -m mwm_torch.train_surgwmbench \
+  --mode train_dynamics \
+  --data-root /path/to/SurgWMBench \
+  --manifest manifests/train.jsonl \
+  --val-manifest manifests/val.jsonl \
+  --config configs/surgwmbench_mwm.yaml
 ```
-TF_XLA_FLAGS=--tf_xla_auto_jit=2 python mwm/train.py --logdir logs --configs dmc_vision --task dmc_manip_reach_duplo --steps 252000 --mae.reward_pred True --mae.early_conv True
+
+Evaluation:
+
+```bash
+uv run --locked python -m mwm_torch.eval_surgwmbench \
+  --data-root /path/to/SurgWMBench \
+  --manifest manifests/test.jsonl \
+  --checkpoint checkpoints/mwm_surgwmbench.pt \
+  --output results/mwm_linear_test_metrics.json
 ```
 
-## Tips
+MAE pretraining and dense auxiliary training use the data loaders in `mwm_torch.data`; their CLI integration is staged separately from the current data-loader migration.
 
-- Use `TF_XLA_FLAGS=--tf_xla_auto_jit=2 ` to accelerate the training. This requires properly setting your CUDA and CUDNN paths in our machine. You can check this whether `which ptxas` gives you a path to the CUDA/bin path in your machine.
+## Notes
 
-- Also see the tips available in [DreamerV2 repository](https://github.com/danijar/dreamerv2/blob/main/README.md#tips).
+- Sparse human-anchor metrics are primary.
+- Dense interpolation metrics must be reported as pseudo-coordinate metrics.
+- `old_frame_idx` is preserved only as legacy metadata and is not the dense local frame index.
+- Clip frames are real video frames; only coordinates are interpolated.

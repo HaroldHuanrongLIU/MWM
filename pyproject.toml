@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.13,<3.14"
 dependencies = [
     "numpy>=1.24",
+    "opencv-python>=4.8",
     "Pillow>=9.5",
     "PyYAML>=6.0",
     "torch>=2.2,<3.0",
@@ -15,11 +16,6 @@ dependencies = [
 [dependency-groups]
 dev = [
     "pytest>=7.0",
-]
-
-[project.optional-dependencies]
-raw-video = [
-    "opencv-python>=4.8",
 ]
 
 [tool.uv]
