@@ -20,6 +20,21 @@ Masked World Models (MWM) is a visual model-based RL algorithm that decouples vi
 
 ## Instructions
 
+PyTorch SurgWMBench environment:
+```
+uv sync --locked
+```
+
+For raw `.avi` video decoding support:
+```
+uv sync --locked --extra raw-video
+```
+
+Run tests in the locked environment:
+```
+uv run --locked python -m pytest -q
+```
+
 Get dependencies:
 ```
 pip install tensorflow==2.6.0 tensorflow_text==2.6.0 tensorflow_estimator==2.6.0 tensorflow_probability==0.14.1 ruamel.yaml 'gym[atari]' dm_control tfimm git+https://github.com/rlworkgroup/metaworld.git@a0009ed9a208ff9864a5c1368c04c273bb20dd06#egg=metaworld

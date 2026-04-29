@@ -1,0 +1,26 @@
+[project]
+name = "mwm-surgwmbench"
+version = "0.1.0"
+description = "PyTorch MWM-style baseline utilities for SurgWMBench."
+readme = "README.md"
+requires-python = ">=3.13,<3.14"
+dependencies = [
+    "numpy>=1.24",
+    "Pillow>=9.5",
+    "PyYAML>=6.0",
+    "torch>=2.2,<3.0",
+    "torchvision>=0.17,<1.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=7.0",
+]
+
+[project.optional-dependencies]
+raw-video = [
+    "opencv-python>=4.8",
+]
+
+[tool.uv]
+package = false
