@@ -185,6 +185,21 @@ def test_sparse_anchor_mode_returns_20_human_anchors(surgwmbench_root: Path) -> 
     assert torch.all(item["selected_coord_sources"] == SOURCE_ENCODING["human"])
 
 
+def test_loader_supports_png_clip_frames(surgwmbench_root: Path) -> None:
+    frames_dir = surgwmbench_root / "clips" / "patient_001" / "traj_001" / "frames"
+    for jpg_path in frames_dir.glob("*.jpg"):
+        jpg_path.rename(jpg_path.with_suffix(".png"))
+    dataset = SurgWMBenchClipDataset(
+        surgwmbench_root,
+        "manifests/train.jsonl",
+        frame_sampling="sparse_anchors",
+        image_size=32,
+    )
+    item = dataset[0]
+    assert item["frames"].shape == (20, 3, 32, 32)
+    assert item["frame_paths"][0].endswith(".png")
+
+
 def test_dense_mode_returns_variable_length_sources(surgwmbench_root: Path) -> None:
     dataset = SurgWMBenchClipDataset(
         surgwmbench_root,

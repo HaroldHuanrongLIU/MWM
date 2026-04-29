@@ -74,6 +74,37 @@ def _resolve_manifest_path(dataset_root: Path, manifest: str | Path) -> Path:
     return dataset_root / path
 
 
+def _resolve_frame_path(
+    dataset_root: Path,
+    frames_dir: Path,
+    local_frame_idx: int,
+    num_frames: int,
+    strict: bool,
+    frame_record: dict[str, Any] | None = None,
+) -> Path:
+    if local_frame_idx < 0 or local_frame_idx >= num_frames:
+        raise ValueError(f"local_frame_idx={local_frame_idx} is outside [0, {num_frames}).")
+    if isinstance(frame_record, dict) and frame_record.get("frame_path"):
+        recorded = _resolve_path(dataset_root, frame_record["frame_path"])
+        if recorded.exists() or strict:
+            return recorded
+    for suffix in (".jpg", ".png", ".jpeg"):
+        candidate = frames_dir / f"{local_frame_idx:06d}{suffix}"
+        if candidate.exists():
+            return candidate
+    canonical = frames_dir / f"{local_frame_idx:06d}.jpg"
+    if strict:
+        return canonical
+    candidates = sorted(
+        path
+        for suffix in ("*.jpg", "*.png", "*.jpeg")
+        for path in frames_dir.glob(suffix)
+    )
+    if local_frame_idx >= len(candidates):
+        raise FileNotFoundError(f"Frame {local_frame_idx} not found under {frames_dir}.")
+    return candidates[local_frame_idx]
+
+
 def _target_hw(image_size: int | tuple[int, int]) -> tuple[int, int] | None:
     if isinstance(image_size, int):
         return None if image_size <= 0 else (image_size, image_size)
@@ -258,7 +289,11 @@ class SurgWMBenchClipDataset(Dataset):
 
         selected_indices = self._select_indices(num_frames, human_local_indices)
         frames_dir = _resolve_path(self.dataset_root, row["frames_dir"])
-        frame_paths = [self._frame_path(frames_dir, int(frame_idx), num_frames) for frame_idx in selected_indices]
+        frame_records = self._frame_records_by_local_idx(annotation)
+        frame_paths = [
+            self._frame_path(frames_dir, int(frame_idx), num_frames, frame_records.get(int(frame_idx)))
+            for frame_idx in selected_indices
+        ]
 
         frames_tensor: torch.Tensor | None = None
         image_size_from_frames: tuple[int, int] | None = None
@@ -438,16 +473,33 @@ class SurgWMBenchClipDataset(Dataset):
         window = num_frames if self.max_frames is None else min(num_frames, int(self.max_frames))
         return list(range(max(0, window)))
 
-    def _frame_path(self, frames_dir: Path, local_frame_idx: int, num_frames: int) -> Path:
-        if local_frame_idx < 0 or local_frame_idx >= num_frames:
-            raise ValueError(f"local_frame_idx={local_frame_idx} is outside [0, {num_frames}).")
-        canonical = frames_dir / f"{local_frame_idx:06d}.jpg"
-        if canonical.exists() or self.strict:
-            return canonical
-        candidates = sorted(frames_dir.glob("*.jpg"))
-        if local_frame_idx >= len(candidates):
-            raise FileNotFoundError(f"Frame {local_frame_idx} not found under {frames_dir}.")
-        return candidates[local_frame_idx]
+    @staticmethod
+    def _frame_records_by_local_idx(annotation: dict[str, Any]) -> dict[int, dict[str, Any]]:
+        records = annotation.get("frames")
+        if not isinstance(records, list):
+            return {}
+        result: dict[int, dict[str, Any]] = {}
+        for fallback_idx, record in enumerate(records):
+            if isinstance(record, dict):
+                local_idx = int(record.get("local_frame_idx", fallback_idx))
+                result[local_idx] = record
+        return result
+
+    def _frame_path(
+        self,
+        frames_dir: Path,
+        local_frame_idx: int,
+        num_frames: int,
+        frame_record: dict[str, Any] | None = None,
+    ) -> Path:
+        return _resolve_frame_path(
+            self.dataset_root,
+            frames_dir,
+            local_frame_idx,
+            num_frames,
+            self.strict,
+            frame_record,
+        )
 
     def _select_interpolation_method(self, row: dict[str, Any]) -> str:
         method = self.interpolation_method or row.get("default_interpolation_method") or "linear"
@@ -590,7 +642,11 @@ class SurgWMBenchSSLFrameDataset(Dataset):
 
     def __getitem__(self, index: int) -> dict[str, Any]:
         row, start, frames_dir = self.samples[index]
-        frame_paths = [frames_dir / f"{idx:06d}.jpg" for idx in range(start, start + self.sequence_length)]
+        num_frames = int(row.get("num_frames") or 0)
+        frame_paths = [
+            _resolve_frame_path(self.dataset_root, frames_dir, idx, num_frames, strict=True)
+            for idx in range(start, start + self.sequence_length)
+        ]
         tensors = [_pil_to_tensor(path, self.image_size)[0] for path in frame_paths]
         frames = torch.stack(tensors, dim=0)
         item = {
