@@ -8,3 +8,6 @@ MUJOCO_LOG.TXT
 .vscode
 *.ipynb
 logdir*
+checkpoints/
+logs/
+results/

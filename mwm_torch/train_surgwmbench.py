@@ -320,7 +320,15 @@ def train_pretrain_mae(args: argparse.Namespace, config: SurgWMBenchConfig) -> P
     output_dir = ensure_dir(args.output_dir or config.train.output_dir)
     ckpt_path = output_dir / "mwm_mae_surgwmbench.pt"
 
-    for epoch in range(1, config.train.epochs + 1):
+    start_epoch = 0
+    if getattr(args, "resume", False) and ckpt_path.exists():
+        state = torch.load(ckpt_path, map_location=device)
+        model.load_state_dict(state["mae"] if "mae" in state else state["model"])
+        optimizer.load_state_dict(state["optimizer"])
+        start_epoch = int(state.get("epoch", 0))
+        print(f"resumed_from={ckpt_path} start_epoch={start_epoch}")
+
+    for epoch in range(start_epoch + 1, config.train.epochs + 1):
         model.train()
         start = time.time()
         running = []
@@ -472,6 +480,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--stride", type=int, default=None)
     parser.add_argument("--max-videos", type=int, default=None)
     parser.add_argument("--max-clips-per-video", type=int, default=None)
+    parser.add_argument("--resume", action="store_true", help="Continue MAE pretraining from existing checkpoint.")
     return parser.parse_args()
 
 

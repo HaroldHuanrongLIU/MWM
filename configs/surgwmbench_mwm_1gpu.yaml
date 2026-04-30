@@ -1,0 +1,84 @@
+model:
+  image_size: 224
+  patch_size: 16
+  latent_dim: 512
+  hidden_dim: 512
+  coord_dim: 2
+  action_dim: 3
+  coord_embed_dim: 64
+  action_embed_dim: 64
+  action_type: "continuous_delta"
+  use_time_delta: true
+  dynamics_type: "gru"
+  mask_ratio: 0.5
+  encoder_depth: 4
+  decoder_depth: 2
+  num_heads: 8
+  decoder_num_heads: 8
+  conv_stem_channels: [64, 128]
+  compile: false
+
+data:
+  dataset_name: "SurgWMBench"
+  dataset_root: "/mnt/data/SurgWMBench"
+  train_manifest: "manifests/train.jsonl"
+  val_manifest: "manifests/val.jsonl"
+  test_manifest: "manifests/test.jsonl"
+  interpolation_method: "linear"
+  default_interpolation_method: "linear"
+  available_interpolation_methods:
+    - "linear"
+    - "pchip"
+    - "akima"
+    - "cubic_spline"
+  coordinate_normalization: "image_size"
+  coordinate_format: "norm"
+  use_dense_pseudo: false
+  max_frames_per_clip: null
+  num_sparse_anchors: 20
+  image_width: 1920
+  image_height: 1080
+  image_size: 224
+  frame_sampling: "sparse_anchors"
+  split_policy: "patient_video_level_existing_manifests"
+  source_encoding:
+    unlabeled: 0
+    human: 1
+    interpolated: 2
+  ssl:
+    source: "raw_videos"
+    backend: "opencv"
+    clip_length: 16
+    stride: 8
+    fallback_to_clip_frames: true
+    max_videos: null
+    max_clips_per_video: 256
+
+train:
+  batch_size: 96
+  num_workers: 16
+  lr: 1.0e-4
+  weight_decay: 1.0e-4
+  epochs: 100
+  precision: "amp"
+  seed: 42
+  grad_clip_norm: 100.0
+  output_dir: "checkpoints"
+  log_every: 50
+  freeze_encoder: false
+
+loss:
+  recon_weight: 1.0
+  latent_weight: 1.0
+  sparse_coord_weight: 10.0
+  dense_coord_weight: 1.0
+  dense_pseudo_coord_weight: 1.0
+  smoothness_weight: 0.1
+  coord_loss: "smooth_l1"
+
+eval:
+  primary_target: "sparse_human_anchors"
+  report_pixel_metrics: true
+  horizons: [1, 3, 5, 10, 20]
+  stratify_by_difficulty: true
+  dense_pseudo_eval: false
